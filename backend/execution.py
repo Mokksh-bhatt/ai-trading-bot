@@ -88,9 +88,11 @@ def execute_paper_trade(
         if snapshot.asset_class == "stock":
             if alpaca_client:
                 try:
+                    # Alpaca does not allow shorting fractional shares, so we use integer qty
+                    qty_int = max(1, int(1000.0 / snapshot.price))
                     market_order_data = MarketOrderRequest(
                         symbol=alpaca_symbol,
-                        notional=1000,
+                        qty=qty_int,
                         side=side,
                         time_in_force=TimeInForce.DAY
                     )
@@ -107,7 +109,8 @@ def execute_paper_trade(
                             quantity_val = float(order_status.filled_qty)
                             break
                 except Exception as e:
-                    print(f"[ALPACA ERROR] {str(e)}", flush=True)
+                    error_msg = str(e).encode('ascii', 'ignore').decode('ascii')
+                    print(f"[ALPACA ERROR] {error_msg}", flush=True)
                     return # Exit without simulating
             else:
                 print(f"[WARNING] No Alpaca Keys. Cannot execute {side.name} for {snapshot.symbol}.", flush=True)
@@ -147,7 +150,8 @@ def execute_paper_trade(
                     quantity_val = float(qty_to_trade)
                         
                 except Exception as e:
-                    error_msg = f"[BYBIT ERROR] {str(e)}"
+                    safe_error = str(e).encode('ascii', 'ignore').decode('ascii')
+                    error_msg = f"[BYBIT ERROR] {safe_error}"
                     print(error_msg, flush=True)
                     return error_msg
             else:
@@ -225,20 +229,14 @@ def execute_paper_trade(
                         
                         qty_to_close = (quantity // qty_step) * qty_step
                         
-                        import time
-                        original_time = time.time
-                        try:
-                            time.time = lambda: original_time() - 2.0
-                            order = bybit_client.place_order(
-                                category="linear",
-                                symbol=pybit_symbol,
-                                side=pybit_side,
-                                orderType="Market",
-                                qty=str(qty_to_close),
-                                reduceOnly=True
-                            )
-                        finally:
-                            time.time = original_time
+                        order = bybit_client.place_order(
+                            category="linear",
+                            symbol=pybit_symbol,
+                            side=pybit_side,
+                            orderType="Market",
+                            qty=str(qty_to_close),
+                            reduceOnly=True
+                        )
                         
                         exit_price_val = snapshot.price
                             
