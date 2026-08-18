@@ -14,15 +14,18 @@ from backend.execution import execute_paper_trade
 from backend.learning import generate_long_term_memory, get_learned_rules
 from datetime import datetime, timezone
 
-SYMBOLS = [
-    ("BTC/USDT", "crypto"),
-    ("ETH/USDT", "crypto"),
-    ("SOL/USDT", "crypto"),
-    ("DOGE/USDT", "crypto"),
-    ("AAPL", "stock"),
-    ("TSLA", "stock"),
-    ("NVDA", "stock")
+import random
+
+ALL_SYMBOLS = [
+    ("BTC/USDT", "crypto"), ("ETH/USDT", "crypto"), ("SOL/USDT", "crypto"), ("DOGE/USDT", "crypto"),
+    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto"),
+    ("AAPL", "stock"), ("TSLA", "stock"), ("NVDA", "stock"), ("AMD", "stock"),
+    ("MSFT", "stock"), ("AMZN", "stock"), ("META", "stock"), ("GOOGL", "stock"),
+    ("NFLX", "stock"), ("PLTR", "stock"), ("COIN", "stock"), ("MSTR", "stock")
 ]
+
+# The AI dynamically picks 7 assets to focus on for this trading session
+SYMBOLS = random.sample(ALL_SYMBOLS, 7)
 
 heuristic = HeuristicTrader()
 ollama_trader = OllamaTrader(model_name="qwen2.5-coder:7b")
