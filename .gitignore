@@ -21,3 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+.env
+backend/venv/
+backend/__pycache__/
+backend/*.db
+backend/bias_cache.json

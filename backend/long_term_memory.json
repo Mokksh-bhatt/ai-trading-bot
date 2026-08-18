@@ -1,0 +1,7 @@
+{
+    "learned_rules": [
+        "Do not enter trades when live PnL is below the critical exit rule of -0.5%.",
+        "Cut losses immediately when a position's PnL exceeds the critical loss threshold of -0.5%",
+        "Sell positions with a PnL below the target profit threshold of 10% to lock in profits."
+    ]
+}

@@ -27,7 +27,7 @@ class App extends Component {
     switch(this.state.selectedTab) {
       case 'home':
       default:
-        return HomeTab();
+        return <HomeTab />;
       case 'shipping-requests':
         return this.renderShippingRequests();
     }

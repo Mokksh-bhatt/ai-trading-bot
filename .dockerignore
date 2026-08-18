@@ -1,0 +1,8 @@
+backend/venv/
+backend/__pycache__/
+backend/bot_database.db
+backend/trades.db
+backend/bias_cache.json
+frontend/node_modules/
+.git/
+.env

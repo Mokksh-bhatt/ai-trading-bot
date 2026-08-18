@@ -4,6 +4,7 @@ import './Swimlane.css';
 
 export default class Swimlane extends React.Component {
   render() {
+    // build the cards array
     const cards = this.props.clients.map(client => {
       return (
         <Card
@@ -15,6 +16,8 @@ export default class Swimlane extends React.Component {
         />
       );
     })
+    
+    // the column itself
     return (
       <div className="Swimlane-column">
         <div className="Swimlane-title">{this.props.name}</div>
