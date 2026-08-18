@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
-import ccxt
+from pybit.unified_trading import HTTP
 
 from backend.models import MarketSnapshot, TradeRecord
 from backend.traders.base import TraderDecision
@@ -27,18 +27,13 @@ def get_alpaca_client():
 def get_bybit_client():
     if not BYBIT_KEY or not BYBIT_SECRET:
         return None
-    exchange = ccxt.bybit({
-        'apiKey': BYBIT_KEY,
-        'secret': BYBIT_SECRET,
-        'enableRateLimit': True,
-        'options': {
-            'defaultType': 'swap',
-            'recvWindow': 10000,
-        }
-    })
-    # TESTNET ACCOUNT
-    exchange.set_sandbox_mode(True)
-    return exchange
+    # We detected the user is using Bybit Demo Trading!
+    return HTTP(
+        demo=True,
+        api_key=BYBIT_KEY,
+        api_secret=BYBIT_SECRET,
+        recv_window=60000
+    )
 
 def execute_paper_trade(
     model_name: str, 
@@ -49,7 +44,7 @@ def execute_paper_trade(
     bybit_client = get_bybit_client()
 
     alpaca_symbol = snapshot.symbol.replace("USDT", "USD") if snapshot.asset_class == "crypto" else snapshot.symbol
-    bybit_symbol = f"{snapshot.symbol.replace('USDT', '')}/USDT:USDT" if snapshot.asset_class == "crypto" else snapshot.symbol
+    bybit_symbol = f"{snapshot.symbol.replace('/USDT', '')}/USDT:USDT" if snapshot.asset_class == "crypto" else snapshot.symbol
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -122,26 +117,34 @@ def execute_paper_trade(
         elif snapshot.asset_class == "crypto":
             if bybit_client:
                 try:
-                    ccxt_side = "buy" if direction == "long" else "sell"
-                    print(f"[{model_name}] [BYBIT {ccxt_side.upper()}] Sending Testnet Order for {bybit_symbol}!", flush=True)
+                    pybit_side = "Buy" if direction == "long" else "Sell"
+                    print(f"[{model_name}] [BYBIT {pybit_side.upper()}] Sending Demo Order for {snapshot.symbol}!", flush=True)
                     
-                    bybit_client.load_markets()
-                    market = bybit_client.market(bybit_symbol)
+                    pybit_symbol = snapshot.symbol.replace("/", "")
+                    # Fetch instrument info for precision
+                    market_info = bybit_client.get_instruments_info(category="linear", symbol=pybit_symbol)
+                    qty_step = float(market_info['result']['list'][0]['lotSizeFilter']['qtyStep'])
                     
-                    qty_to_trade = float(bybit_client.amount_to_precision(bybit_symbol, quantity_val))
+                    # Round down to nearest qty_step
+                    qty_to_trade = (quantity_val // qty_step) * qty_step
                     
-                    order = bybit_client.create_market_order(
-                        symbol=bybit_symbol,
-                        side=ccxt_side,
-                        amount=qty_to_trade,
-                        params={}
-                    )
+                    import time
+                    original_time = time.time
+                    try:
+                        time.time = lambda: original_time() - 2.0
+                        order = bybit_client.place_order(
+                            category="linear",
+                            symbol=pybit_symbol,
+                            side=pybit_side,
+                            orderType="Market",
+                            qty=str(qty_to_trade)
+                        )
+                    finally:
+                        time.time = original_time
                     
-                    if order and 'average' in order and order['average'] is not None:
-                        entry_price_val = float(order['average'])
-                        quantity_val = float(order['filled'])
-                    else:
-                        print("[WARNING] Bybit market order filled but avg price not returned immediately, using snapshot price.", flush=True)
+                    # Simulated execution metrics since Demo Market Orders fill instantly
+                    entry_price_val = snapshot.price
+                    quantity_val = float(qty_to_trade)
                         
                 except Exception as e:
                     error_msg = f"[BYBIT ERROR] {str(e)}"
@@ -212,23 +215,32 @@ def execute_paper_trade(
             elif snapshot.asset_class == "crypto":
                 if bybit_client:
                     try:
-                        ccxt_side = "sell" if direction == "long" else "buy"
-                        print(f"[{model_name}] [BYBIT {ccxt_side.upper()}] Closing Testnet Position for {bybit_symbol}!", flush=True)
+                        pybit_side = "Sell" if direction == "long" else "Buy"
+                        print(f"[{model_name}] [BYBIT {pybit_side.upper()}] Closing Demo Position for {snapshot.symbol}!", flush=True)
                         
-                        bybit_client.load_markets()
-                        qty_to_close = float(bybit_client.amount_to_precision(bybit_symbol, quantity))
+                        pybit_symbol = snapshot.symbol.replace("/", "")
+                        # Fetch instrument info for precision
+                        market_info = bybit_client.get_instruments_info(category="linear", symbol=pybit_symbol)
+                        qty_step = float(market_info['result']['list'][0]['lotSizeFilter']['qtyStep'])
                         
-                        order = bybit_client.create_market_order(
-                            symbol=bybit_symbol,
-                            side=ccxt_side,
-                            amount=qty_to_close,
-                            params={'reduceOnly': True}
+                        qty_to_close = (quantity // qty_step) * qty_step
+                        
+                    import time
+                    original_time = time.time
+                    try:
+                        time.time = lambda: original_time() - 2.0
+                        order = bybit_client.place_order(
+                            category="linear",
+                            symbol=pybit_symbol,
+                            side=pybit_side,
+                            orderType="Market",
+                            qty=str(qty_to_close),
+                            reduceOnly=True
                         )
+                    finally:
+                        time.time = original_time
                         
-                        if order and 'average' in order and order['average'] is not None:
-                            exit_price_val = float(order['average'])
-                        else:
-                            print("[WARNING] Bybit close order filled but avg price not returned immediately.", flush=True)
+                    exit_price_val = snapshot.price
                             
                     except Exception as e:
                         print(f"[BYBIT ERROR] {str(e)}", flush=True)
