@@ -18,13 +18,19 @@ import random
 
 ALL_SYMBOLS = [
     ("BTC/USDT", "crypto"), ("ETH/USDT", "crypto"), ("SOL/USDT", "crypto"), ("DOGE/USDT", "crypto"),
-    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto")
+    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto"), ("MSTR", "stock")
 ]
 
-# The AI dynamically picks 3 assets to focus on for this trading session
-SYMBOLS = random.sample(ALL_SYMBOLS, 3)
+# The AI dynamically picks assets, but user requested DOGE and MSTR specifically
+SYMBOLS = [
+    ("DOGE/USDT", "crypto"),
+    ("MSTR", "stock"),
+    ("BTC/USDT", "crypto")
+]
 
-heuristic = HeuristicTrader()
+from backend.traders.ollama import OllamaTrader
+
+heuristic = OllamaTrader()
 
 import json
 import os
@@ -88,10 +94,13 @@ async def macro_analysis_loop():
                     o_context["recent_api_error_from_exchange"] = API_ERRORS[symbol]
                     
                 o_decision = await asyncio.to_thread(heuristic.decide, snapshot, o_context)
-                
-                bias = o_decision.get("action", "neutral")
+                bias = str(o_decision.get("action", "neutral")).lower()
                 reasoning = o_decision.get("reasoning", "No reasoning")
-                clean_bias = bias if bias in ["bullish", "bearish"] else "neutral"
+                
+                # Map various AI outputs to strict macro signals
+                if bias in ["buy", "bullish"]: clean_bias = "bullish"
+                elif bias in ["sell", "bearish"]: clean_bias = "bearish"
+                else: clean_bias = "neutral"
                 
                 AI_MACRO_BIAS[symbol] = {
                     "bias": clean_bias,
