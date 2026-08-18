@@ -125,8 +125,17 @@ async def macro_analysis_loop():
 
 async def fast_execution_loop():
     print("[INIT] High-Frequency Grid Execution Loop Started (2s tick)", flush=True)
+    
+    # Dictionary to track when a symbol is allowed to trade again after an error
+    import time
+    error_cooldowns = {}
+    
     while True:
         for symbol, asset_class in SYMBOLS:
+            current_time = time.time()
+            if symbol in error_cooldowns and current_time < error_cooldowns[symbol]:
+                continue # Skip this symbol until the cooldown expires
+                
             try:
                 price = await asyncio.to_thread(fetch_fast_price, symbol, asset_class)
                 if price <= 0: continue
@@ -167,7 +176,9 @@ async def fast_execution_loop():
                         decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "hft"}
                         
                     err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
-                    if err: API_ERRORS[symbol] = err
+                    if err:
+                        API_ERRORS[symbol] = err
+                        error_cooldowns[symbol] = current_time + 60.0 # 60 second cooldown on error
                 
                 conn.close()
             except Exception as e:

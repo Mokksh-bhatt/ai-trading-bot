@@ -27,6 +27,9 @@ def get_alpaca_client():
 def get_bybit_client():
     if not BYBIT_KEY or not BYBIT_SECRET:
         return None
+    # Debug: Print masked keys to absolutely verify what is being sent to Bybit
+    print(f"[DEBUG] Bybit SDK Initializing with Key: {BYBIT_KEY[:4]}...{BYBIT_KEY[-4:]}", flush=True)
+    
     # We detected the user is using Bybit Demo Trading!
     return HTTP(
         demo=True,
