@@ -150,12 +150,13 @@ async def fast_execution_loop():
                     
                     if bias == "bullish":
                         decision = {"action": "buy", "confidence": 0.9, "reasoning": "AI Bias Bullish Trigger", "timeframe_tag": "hft"}
-                        err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
-                        if err: API_ERRORS[symbol] = err
                     elif bias == "bearish":
                         decision = {"action": "sell", "confidence": 0.9, "reasoning": "AI Bias Bearish Trigger", "timeframe_tag": "hft"}
-                        err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
-                        if err: API_ERRORS[symbol] = err
+                    else:
+                        decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "hft"}
+                        
+                    err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
+                    if err: API_ERRORS[symbol] = err
                 
                 conn.close()
             except Exception as e:
