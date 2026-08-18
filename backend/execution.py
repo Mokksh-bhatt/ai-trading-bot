@@ -21,6 +21,7 @@ BYBIT_SECRET = os.getenv("BYBIT_API_SECRET", "")
 def get_alpaca_client():
     if not API_KEY or not API_SECRET or API_KEY == "YOUR_ALPACA_API_KEY_HERE":
         return None
+    # PAPER TRADING ACCOUNT
     return TradingClient(API_KEY, API_SECRET, paper=True)
 
 def get_bybit_client():
@@ -35,6 +36,7 @@ def get_bybit_client():
             'recvWindow': 10000,
         }
     })
+    # TESTNET ACCOUNT
     exchange.set_sandbox_mode(True)
     return exchange
 
@@ -42,7 +44,7 @@ def execute_paper_trade(
     model_name: str, 
     decision: TraderDecision, 
     snapshot: MarketSnapshot
-) -> None:
+) -> str | None:
     alpaca_client = get_alpaca_client()
     bybit_client = get_bybit_client()
 
@@ -111,9 +113,10 @@ def execute_paper_trade(
                             break
                 except Exception as e:
                     print(f"[ALPACA ERROR] {str(e)}", flush=True)
-                    print(f"[WARNING] Alpaca rejected the trade. Simulating local execution instead...", flush=True)
+                    return # Exit without simulating
             else:
-                print(f"[WARNING] No Alpaca Keys. Simulating Local {side.name} for {snapshot.symbol}.", flush=True)
+                print(f"[WARNING] No Alpaca Keys. Cannot execute {side.name} for {snapshot.symbol}.", flush=True)
+                return # Exit without simulating
         
         # CRYPTO EXECUTION (BYBIT)
         elif snapshot.asset_class == "crypto":
@@ -141,10 +144,13 @@ def execute_paper_trade(
                         print("[WARNING] Bybit market order filled but avg price not returned immediately, using snapshot price.", flush=True)
                         
                 except Exception as e:
-                    print(f"[BYBIT ERROR] {str(e)}", flush=True)
-                    print(f"[WARNING] Bybit rejected the trade. Simulating local execution instead...", flush=True)
+                    error_msg = f"[BYBIT ERROR] {str(e)}"
+                    print(error_msg, flush=True)
+                    return error_msg
             else:
-                print(f"[WARNING] No Bybit Keys. Simulating Local {side.name} for {snapshot.symbol}.", flush=True)
+                error_msg = f"[WARNING] No Bybit Keys. Cannot execute {side.name} for {snapshot.symbol}."
+                print(error_msg, flush=True)
+                return error_msg
 
 
         entry_time = datetime.now(timezone.utc).isoformat()
@@ -197,9 +203,10 @@ def execute_paper_trade(
                                 
                     except Exception as e:
                         print(f"[ALPACA ERROR] {str(e)}", flush=True)
-                        print(f"[WARNING] Alpaca rejected the close. Simulating local execution instead...", flush=True)
+                        return # Exit without simulating
                 else:
-                    print(f"[WARNING] No Alpaca Keys. Simulating Local Close for {snapshot.symbol}.", flush=True)
+                    print(f"[WARNING] No Alpaca Keys. Cannot Close {snapshot.symbol}.", flush=True)
+                    return # Exit without simulating
 
             # CRYPTO EXECUTION (BYBIT)
             elif snapshot.asset_class == "crypto":
@@ -225,9 +232,10 @@ def execute_paper_trade(
                             
                     except Exception as e:
                         print(f"[BYBIT ERROR] {str(e)}", flush=True)
-                        print(f"[WARNING] Bybit rejected the close. Simulating local execution instead...", flush=True)
+                        return # Exit without simulating
                 else:
-                    print(f"[WARNING] No Bybit Keys. Simulating Local Close for {snapshot.symbol}.", flush=True)
+                    print(f"[WARNING] No Bybit Keys. Cannot Close {snapshot.symbol}.", flush=True)
+                    return # Exit without simulating
             
             exit_fee = (exit_price_val * quantity) * 0.0001
             total_fees = float(open_trade["simulated_fees"]) + exit_fee

@@ -18,17 +18,13 @@ import random
 
 ALL_SYMBOLS = [
     ("BTC/USDT", "crypto"), ("ETH/USDT", "crypto"), ("SOL/USDT", "crypto"), ("DOGE/USDT", "crypto"),
-    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto"),
-    ("AAPL", "stock"), ("TSLA", "stock"), ("NVDA", "stock"), ("AMD", "stock"),
-    ("MSFT", "stock"), ("AMZN", "stock"), ("META", "stock"), ("GOOGL", "stock"),
-    ("NFLX", "stock"), ("PLTR", "stock"), ("COIN", "stock"), ("MSTR", "stock")
+    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto")
 ]
 
-# The AI dynamically picks 7 assets to focus on for this trading session
-SYMBOLS = random.sample(ALL_SYMBOLS, 7)
+# The AI dynamically picks 3 assets to focus on for this trading session
+SYMBOLS = random.sample(ALL_SYMBOLS, 3)
 
 heuristic = HeuristicTrader()
-ollama_trader = OllamaTrader(model_name="qwen2.5-coder:7b")
 
 import json
 import os
@@ -52,6 +48,7 @@ def save_bias_cache(cache):
         json.dump(cache, f)
 
 AI_MACRO_BIAS = load_bias_cache()
+API_ERRORS = {}
 
 async def macro_analysis_loop():
     print("[INIT] Macro AI Analysis Loop Started (60s tick)", flush=True)
@@ -71,10 +68,10 @@ async def macro_analysis_loop():
                 long_term_rules = get_learned_rules()
                 base_context.update({"avg_volume": snapshot.volume * 0.95, "recent_trend": "active", "long_term_lessons": long_term_rules})
                 
-                cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'OllamaTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
+                cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'HeuristicTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
                 o_past = [dict(r) for r in cursor.fetchall()]
                 
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'HeuristicTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 current_pos = None
                 if o_open:
@@ -87,7 +84,10 @@ async def macro_analysis_loop():
                     current_pos = {"direction": direction, "entry_price": entry_price, "current_price": snapshot.price, "live_pnl_pct": round(live_pnl_pct, 4)}
                 
                 o_context = {**base_context, "past_trades": o_past, "current_position": current_pos}
-                o_decision = await asyncio.to_thread(ollama_trader.decide, snapshot, o_context)
+                if symbol in API_ERRORS:
+                    o_context["recent_api_error_from_exchange"] = API_ERRORS[symbol]
+                    
+                o_decision = await asyncio.to_thread(heuristic.decide, snapshot, o_context)
                 
                 bias = o_decision.get("action", "neutral")
                 reasoning = o_decision.get("reasoning", "No reasoning")
@@ -126,7 +126,7 @@ async def fast_execution_loop():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'HeuristicTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 
                 if o_open:
@@ -142,7 +142,7 @@ async def fast_execution_loop():
                     if live_pnl_pct > 0.03 or live_pnl_pct < -0.10:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
                         decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "hft"}
-                        await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                        await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
                 else:
                     # Flat. Check AI bias.
                     macro_state = AI_MACRO_BIAS.get(symbol, {})
@@ -150,10 +150,12 @@ async def fast_execution_loop():
                     
                     if bias == "bullish":
                         decision = {"action": "buy", "confidence": 0.9, "reasoning": "AI Bias Bullish Trigger", "timeframe_tag": "hft"}
-                        await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                        err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
+                        if err: API_ERRORS[symbol] = err
                     elif bias == "bearish":
                         decision = {"action": "sell", "confidence": 0.9, "reasoning": "AI Bias Bearish Trigger", "timeframe_tag": "hft"}
-                        await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                        err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
+                        if err: API_ERRORS[symbol] = err
                 
                 conn.close()
             except Exception as e:
