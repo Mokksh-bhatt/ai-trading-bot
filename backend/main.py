@@ -12,6 +12,8 @@ from backend.traders.heuristic import HeuristicTrader
 from backend.traders.ollama import OllamaTrader
 from backend.execution import execute_paper_trade
 from backend.learning import generate_long_term_memory, get_learned_rules
+from dotenv import load_dotenv
+load_dotenv(override=True)
 from datetime import datetime, timezone
 
 import random

@@ -11,7 +11,7 @@ from backend.models import MarketSnapshot, TradeRecord
 from backend.traders.base import TraderDecision
 from backend.db import get_db_connection, get_supabase
 
-load_dotenv()
+load_dotenv(override=True)
 API_KEY = os.getenv("ALPACA_API_KEY", "")
 API_SECRET = os.getenv("ALPACA_API_SECRET", "")
 
