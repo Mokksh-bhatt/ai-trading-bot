@@ -146,7 +146,7 @@ async def fast_execution_loop():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'HeuristicTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 
                 if o_open:
@@ -162,7 +162,7 @@ async def fast_execution_loop():
                     if live_pnl_pct > 0.03 or live_pnl_pct < -0.10:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
                         decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "hft"}
-                        await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
+                        await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                 else:
                     # Flat. Check AI bias.
                     macro_state = AI_MACRO_BIAS.get(symbol, {})
@@ -175,7 +175,7 @@ async def fast_execution_loop():
                     else:
                         decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "hft"}
                         
-                    err = await asyncio.to_thread(execute_paper_trade, "HeuristicTrader", decision, lite_snap)
+                    err = await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                     if err:
                         API_ERRORS[symbol] = err
                         error_cooldowns[symbol] = current_time + 60.0 # 60 second cooldown on error
