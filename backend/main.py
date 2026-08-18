@@ -159,7 +159,7 @@ async def fast_execution_loop():
                 
                 conn.close()
             except Exception as e:
-                pass
+                print(f"[FAST LOOP ERROR] {e}")
         await asyncio.sleep(2)
 
 @asynccontextmanager

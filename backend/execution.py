@@ -225,22 +225,22 @@ def execute_paper_trade(
                         
                         qty_to_close = (quantity // qty_step) * qty_step
                         
-                    import time
-                    original_time = time.time
-                    try:
-                        time.time = lambda: original_time() - 2.0
-                        order = bybit_client.place_order(
-                            category="linear",
-                            symbol=pybit_symbol,
-                            side=pybit_side,
-                            orderType="Market",
-                            qty=str(qty_to_close),
-                            reduceOnly=True
-                        )
-                    finally:
-                        time.time = original_time
+                        import time
+                        original_time = time.time
+                        try:
+                            time.time = lambda: original_time() - 2.0
+                            order = bybit_client.place_order(
+                                category="linear",
+                                symbol=pybit_symbol,
+                                side=pybit_side,
+                                orderType="Market",
+                                qty=str(qty_to_close),
+                                reduceOnly=True
+                            )
+                        finally:
+                            time.time = original_time
                         
-                    exit_price_val = snapshot.price
+                        exit_price_val = snapshot.price
                             
                     except Exception as e:
                         print(f"[BYBIT ERROR] {str(e)}", flush=True)
