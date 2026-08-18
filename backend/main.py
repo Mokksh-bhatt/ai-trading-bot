@@ -30,7 +30,10 @@ ollama_trader = OllamaTrader(model_name="qwen2.5-coder:7b")
 import json
 import os
 
-BIAS_CACHE_FILE = "backend/bias_cache.json"
+if os.path.exists("/app/data"):
+    BIAS_CACHE_FILE = "/app/data/bias_cache.json"
+else:
+    BIAS_CACHE_FILE = "backend/bias_cache.json"
 
 def load_bias_cache():
     if os.path.exists(BIAS_CACHE_FILE):

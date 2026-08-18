@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = 'https://ai-trading-bot-production-29ad.up.railway.app/api';
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,

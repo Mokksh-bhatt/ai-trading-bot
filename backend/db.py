@@ -10,7 +10,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # SQLite Local DB Setup
-DB_FILE = os.path.join(os.path.dirname(__file__), "trades.db")
+if os.path.exists("/app/data"):
+    DB_FILE = "/app/data/trades.db"
+else:
+    DB_FILE = os.path.join(os.path.dirname(__file__), "trades.db")
 
 def init_local_db():
     conn = sqlite3.connect(DB_FILE)
