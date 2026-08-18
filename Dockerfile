@@ -17,4 +17,4 @@ COPY backend/ ./backend/
 EXPOSE 8001
 
 # Command to run the backend
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8001}
