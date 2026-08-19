@@ -134,7 +134,7 @@ async def swarm_manager_loop():
             from backend.learning import generate_long_term_memory
             asyncio.create_task(asyncio.to_thread(generate_long_term_memory, "qwen2.5-coder:7b"))
             
-        await asyncio.sleep(60)
+        await asyncio.sleep(15)
 
 async def fast_execution_loop():
     print("[INIT] High-Frequency Grid Execution Loop Started (2s tick)", flush=True)
