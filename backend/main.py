@@ -203,9 +203,6 @@ async def fast_execution_loop():
                     peak_pct = trade_peak_pnls[trade_id]
 
                     # Infinite Profit / Trailing Stop Logic
-                    # Hard Stop Loss: -0.25%
-                    # Trailing Stop: Drops 0.09% from the peak (activates only after reaching +0.10% profit)
-                    
                     exit_reason = None
                     if live_pnl_pct <= -0.25:
                         exit_reason = f"Grid Hard Stop-Loss ({direction.upper()}) hit at {live_pnl_pct:.4f}%"
@@ -215,6 +212,10 @@ async def fast_execution_loop():
                     if exit_reason:
                         decision = {"action": "close", "confidence": 1.0, "reasoning": exit_reason, "timeframe_tag": "short_swing"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                        # The Anti-Machine-Gun Safeguard: 5-minute cooldown after closing to prevent re-entering a chopped signal
+                        error_cooldowns[symbol] = current_time + 300.0 
+                        if trade_id in trade_peak_pnls:
+                            del trade_peak_pnls[trade_id]
                 else:
                     # Flat. Check AI bias.
                     macro_state = AI_MACRO_BIAS.get(symbol, {})
