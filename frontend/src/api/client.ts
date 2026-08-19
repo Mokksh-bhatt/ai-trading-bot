@@ -72,3 +72,8 @@ export const fetchMacroBias = async (): Promise<Record<string, {bias: string, re
 export const triggerCycle = async (): Promise<void> => {
     await apiClient.post('/trigger');
 };
+
+export const panicSell = async (): Promise<{message: string}> => {
+    const res = await apiClient.post('/panic-sell');
+    return res.data;
+};

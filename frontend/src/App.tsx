@@ -52,9 +52,9 @@ const App: React.FC = () => {
                                     onClick={async () => {
                                         if (window.confirm("Are you sure you want to PANIC SELL all open positions?")) {
                                             try {
-                                                const res = await fetch('/api/panic-sell', { method: 'POST' });
-                                                const data = await res.json();
-                                                alert(data.message || "Panic sell executed.");
+                                                const { panicSell } = await import('./api/client');
+                                                const res = await panicSell();
+                                                alert(res.message || "Panic sell executed.");
                                             } catch (e) {
                                                 alert("Panic sell failed.");
                                             }
