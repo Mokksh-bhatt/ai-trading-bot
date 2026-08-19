@@ -89,8 +89,8 @@ def fetch_market_opportunities(top_n: int = 3):
         # Sort by our composite momentum score descending
         valid_candidates.sort(key=lambda x: x["score"], reverse=True)
         
-        # Return the top N candidates
-        return [(c["symbol"], c["asset_class"]) for c in valid_candidates[:top_n]]
+        # Return the full dictionaries so the AI can see the actual volatility and turnover
+        return valid_candidates[:top_n]
         
     except Exception as e:
         print(f"[SCANNER ERROR] Failed to fetch market opportunities: {e}")

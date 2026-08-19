@@ -56,8 +56,9 @@ async def swarm_manager_loop():
         
         # 1. Scanner finds volatile coins (Wash-Trade filter applied internally)
         targets = fetch_market_opportunities(top_n=10)
-        
-        for symbol, asset_class in targets:
+        for target_data in targets:
+            symbol = target_data["symbol"]
+            asset_class = target_data["asset_class"]
             try:
                 # Check if cache is fresh enough to skip (e.g., if we just booted and cache is < 5 mins old)
                 # But since this loop sleeps 60s anyway, we just run it and update the cache.
@@ -67,8 +68,17 @@ async def swarm_manager_loop():
                 cursor = conn.cursor()
                 
                 base_context = snapshot.context or {}
+                if "TA" in base_context:
+                    del base_context["TA"] # Remove confusing indicators so the AI purely trades momentum
+                
                 long_term_rules = get_learned_rules()
-                base_context.update({"avg_volume": snapshot.volume * 0.95, "recent_trend": "active", "long_term_lessons": long_term_rules})
+                base_context.update({
+                    "24h_price_change_pct": target_data.get("price_change", 0.0) * 100, # Convert to percentage string for the AI
+                    "24h_turnover": target_data.get("turnover", 0.0),
+                    "is_trending_socially": target_data.get("score", 0) > abs(target_data.get("price_change", 0) * target_data.get("turnover", 0)) * 2,
+                    "recent_trend": "extreme_momentum",
+                    "long_term_lessons": long_term_rules
+                })
                 
                 cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'OllamaTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
                 o_past = [dict(r) for r in cursor.fetchall()]

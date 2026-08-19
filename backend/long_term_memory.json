@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Avoid trading BTC/USDT as it consistently results in substantial losses.",
-        "Do not enter trades with a pnl_pct less than -0.5% to prevent significant capital depletion.",
-        "Exit trades quickly when the pnl_pct falls below -1%, to minimize potential further losses."
+        "Do not enter positions with an entry price that is too close to the exit price, as it increases the risk of significant losses.",
+        "Monitor pnl_pct closely during grid execution and exit positions when the pnl_pct reaches a negative value greater than 5% to minimize losses.",
+        "Use the AI Bias trigger as a guide for when to enter or exit positions, but do not rely solely on it. Always analyze market conditions and adjust your strategy accordingly."
     ]
 }
