@@ -214,7 +214,11 @@ async def fast_execution_loop():
                     err = await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                     if err:
                         API_ERRORS[symbol] = err
-                        error_cooldowns[symbol] = current_time + 60.0 # 60 second cooldown on error
+                        if "110126" in err or "agreement" in err.lower():
+                            print(f"[BLACKLIST] {symbol} requires manual UI agreement. Blacklisting for 24h.", flush=True)
+                            error_cooldowns[symbol] = current_time + 86400.0 # 24 hour cooldown
+                        else:
+                            error_cooldowns[symbol] = current_time + 60.0 # 60 second cooldown on normal error
                 
                 conn.close()
             except Exception as e:
