@@ -148,12 +148,26 @@ def execute_paper_trade(
                             orderType="Market",
                             qty=str(qty_to_trade)
                         )
-                    finally:
-                        time.time = original_time
-                    
-                    # Simulated execution metrics since Demo Market Orders fill instantly
-                    entry_price_val = snapshot.price
-                    quantity_val = float(qty_to_trade)
+                        finally:
+                            time.time = original_time
+                            
+                        # Fetch the actual real-world entry price from Bybit to eliminate slippage discrepancy
+                        try:
+                            import time
+                            time.sleep(0.5) # Wait 500ms for demo exchange to settle
+                            pos_info = bybit_client.get_positions(category="linear", symbol=pybit_symbol)
+                            if pos_info['result']['list']:
+                                avg_price_str = pos_info['result']['list'][0]['avgPrice']
+                                if avg_price_str and float(avg_price_str) > 0:
+                                    entry_price_val = float(avg_price_str)
+                                else:
+                                    entry_price_val = snapshot.price
+                            else:
+                                entry_price_val = snapshot.price
+                        except:
+                            entry_price_val = snapshot.price
+                            
+                        quantity_val = float(qty_to_trade)
                         
                 except Exception as e:
                     safe_error = str(e).encode('ascii', 'ignore').decode('ascii')
@@ -253,7 +267,22 @@ def execute_paper_trade(
                         finally:
                             time.time = original_time
                             
-                        exit_price_val = snapshot.price
+                        # Fetch the actual real-world exit price from Bybit executions
+                        try:
+                            import time
+                            time.sleep(0.5)
+                            order_id = order['result']['orderId']
+                            exec_info = bybit_client.get_executions(category="linear", orderId=order_id)
+                            if exec_info['result']['list']:
+                                exec_price_str = exec_info['result']['list'][0]['execPrice']
+                                if exec_price_str and float(exec_price_str) > 0:
+                                    exit_price_val = float(exec_price_str)
+                                else:
+                                    exit_price_val = snapshot.price
+                            else:
+                                exit_price_val = snapshot.price
+                        except:
+                            exit_price_val = snapshot.price
                             
                     except Exception as e:
                         print(f"[BYBIT ERROR] {str(e)}", flush=True)
