@@ -131,11 +131,18 @@ def execute_paper_trade(
                     
                     pybit_symbol = snapshot.symbol.replace("/", "")
                     # Fetch instrument info for precision
+                    # Fetch instrument info for precision
                     market_info = bybit_client.get_instruments_info(category="linear", symbol=pybit_symbol)
-                    qty_step = float(market_info['result']['list'][0]['lotSizeFilter']['qtyStep'])
+                    qty_step_str = market_info['result']['list'][0]['lotSizeFilter']['qtyStep']
+                    qty_step = float(qty_step_str)
                     
-                    # Round down to nearest qty_step
-                    qty_to_trade = (quantity_val // qty_step) * qty_step
+                    # Calculate number of decimal places required by the exchange
+                    decimals = len(qty_step_str.split('.')[1]) if '.' in qty_step_str else 0
+                    
+                    # Round down to nearest qty_step and strictly format to remove Python floating point drift
+                    raw_qty = (quantity_val // qty_step) * qty_step
+                    qty_to_trade_str = f"{raw_qty:.{decimals}f}"
+                    quantity_val = float(qty_to_trade_str) # Sync value for DB
                     
                     import time
                     original_time = time.time
@@ -144,7 +151,7 @@ def execute_paper_trade(
                         symbol=pybit_symbol,
                         side=pybit_side,
                         orderType="Market",
-                        qty=str(qty_to_trade)
+                        qty=qty_to_trade_str
                     )
                         
                     # Fetch the actual real-world entry price from Bybit to eliminate slippage discrepancy
@@ -242,16 +249,22 @@ def execute_paper_trade(
                         pybit_symbol = snapshot.symbol.replace("/", "")
                         # Fetch instrument info for precision
                         market_info = bybit_client.get_instruments_info(category="linear", symbol=pybit_symbol)
-                        qty_step = float(market_info['result']['list'][0]['lotSizeFilter']['qtyStep'])
+                        qty_step_str = market_info['result']['list'][0]['lotSizeFilter']['qtyStep']
+                        qty_step = float(qty_step_str)
                         
-                        qty_to_close = (quantity // qty_step) * qty_step
+                        # Calculate number of decimal places required by the exchange
+                        decimals = len(qty_step_str.split('.')[1]) if '.' in qty_step_str else 0
+                        
+                        # Round down to nearest qty_step and format safely
+                        raw_qty = (quantity // qty_step) * qty_step
+                        qty_to_close_str = f"{raw_qty:.{decimals}f}"
                         
                         order = bybit_client.place_order(
                             category="linear",
                             symbol=pybit_symbol,
                             side=pybit_side,
                             orderType="Market",
-                            qty=str(qty_to_close),
+                            qty=qty_to_close_str,
                             reduceOnly=True
                         )
                         # Fetch the actual real-world exit price from Bybit executions
