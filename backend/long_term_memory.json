@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Avoid entering trades based on AI Bias Bullish Triggers in DOGE/USDT, as it resulted in a ghost trade that was forced to close with a negative pnl_pct of 770.51%.",
-        "Exit trades at grid execution auto-exit signals when the pnl_pct is below -2%, to prevent further losses.",
-        "Do not enter trades on BTC/USDT if there is no clear bullish trigger, as it resulted in a forced close with a negative pnl_pct of 30.16%"
+        "Avoid trading BTC/USDT as it consistently results in substantial losses.",
+        "Do not enter trades with a pnl_pct less than -0.5% to prevent significant capital depletion.",
+        "Exit trades quickly when the pnl_pct falls below -1%, to minimize potential further losses."
     ]
 }

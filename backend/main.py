@@ -92,11 +92,17 @@ async def swarm_manager_loop():
                 o_decision = await asyncio.to_thread(heuristic.decide, snapshot, o_context)
                 bias = str(o_decision.get("action", "neutral")).lower()
                 reasoning = o_decision.get("reasoning", "No reasoning")
+                confidence = float(o_decision.get("confidence", 0.0))
                 
                 # Map various AI outputs to strict macro signals
-                if bias in ["buy", "bullish"]: clean_bias = "bullish"
-                elif bias in ["sell", "bearish"]: clean_bias = "bearish"
-                else: clean_bias = "neutral"
+                # Apply strict confidence threshold: only accept high-conviction signals (>= 0.70)
+                if confidence >= 0.70:
+                    if bias in ["buy", "bullish"]: clean_bias = "bullish"
+                    elif bias in ["sell", "bearish"]: clean_bias = "bearish"
+                    else: clean_bias = "neutral"
+                else:
+                    clean_bias = "neutral"
+                    reasoning = f"[Low Conviction: {confidence}] {reasoning}"
                 
                 AI_MACRO_BIAS[symbol] = {
                     "bias": clean_bias,
@@ -152,20 +158,31 @@ async def fast_execution_loop():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT id, entry_price, direction, quantity FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 
                 if o_open:
                     entry_price = o_open["entry_price"]
                     direction = o_open["direction"]
+                    quantity = o_open["quantity"]
+                    trade_id = o_open["id"]
+                    
                     # Deduct Bybit's 0.055% taker fee twice (Entry + Exit = 0.11% round-trip)
                     # This ensures every trade mathematically starts in the negative as it costs money to open
                     if direction == "long":
                         live_pnl_pct = (((price - entry_price) / entry_price) * 100) - 0.11
+                        unrealized_pnl = ((price - entry_price) * quantity) - (entry_price * quantity * 0.0011)
                     else:
                         live_pnl_pct = (((entry_price - price) / entry_price) * 100) - 0.11
-                    # Hyper-tight auto-TP/SL (adjusted to clear Bybit 0.055% taker fees x2)
-                    if live_pnl_pct > 0.20 or live_pnl_pct < -0.25:
+                        unrealized_pnl = ((entry_price - price) * quantity) - (entry_price * quantity * 0.0011)
+                        
+                    # Update the database so the frontend dashboard shows the live Net PnL (including fees)
+                    cursor.execute("UPDATE trades SET unrealized_pnl = ?, pnl_pct = ? WHERE id = ?", (unrealized_pnl, live_pnl_pct, trade_id))
+                    conn.commit()
+
+                    # High Risk/Reward auto-TP/SL
+                    # TP = 0.35%, SL = -0.25% (Net of 0.11% fees). This ensures an asymmetric RR of 1.4:1+
+                    if live_pnl_pct > 0.35 or live_pnl_pct < -0.25:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
                         decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "short_swing"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
