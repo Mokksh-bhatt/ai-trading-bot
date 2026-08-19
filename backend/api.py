@@ -63,3 +63,40 @@ def get_history(symbol: str = Query(...), asset_class: str = Query(...)):
 def get_macro_bias():
     from backend.main import AI_MACRO_BIAS
     return {"macro_bias": AI_MACRO_BIAS}
+
+@router.post("/api/panic-sell")
+def panic_sell():
+    from backend.main import fetch_fast_price
+    from backend.execution import execute_paper_trade
+    from backend.models import MarketSnapshot
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM trades WHERE status = 'open'")
+    open_trades = cursor.fetchall()
+    
+    results = []
+    for trade in open_trades:
+        symbol = trade["symbol"]
+        asset_class = trade["asset_class"]
+        model = trade["model_name"]
+        
+        try:
+            price = fetch_fast_price(symbol, asset_class)
+            snap = MarketSnapshot(symbol=symbol, price=price, asset_class=asset_class)
+            decision = {
+                "action": "close", 
+                "confidence": 1.0, 
+                "reasoning": "USER TRIGGERED PANIC SELL OFF", 
+                "timeframe_tag": "manual"
+            }
+            err = execute_paper_trade(model, decision, snap)
+            if err:
+                results.append({"symbol": symbol, "status": "error", "error": err})
+            else:
+                results.append({"symbol": symbol, "status": "closed"})
+        except Exception as e:
+            results.append({"symbol": symbol, "status": "error", "error": str(e)})
+            
+    conn.close()
+    return {"message": f"Attempted to close {len(open_trades)} trades", "results": results}

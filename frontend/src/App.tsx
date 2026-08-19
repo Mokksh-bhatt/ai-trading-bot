@@ -49,6 +49,22 @@ const App: React.FC = () => {
                                     </span>
                                 )}
                                 <button
+                                    onClick={async () => {
+                                        if (window.confirm("Are you sure you want to PANIC SELL all open positions?")) {
+                                            try {
+                                                const res = await fetch('/api/panic-sell', { method: 'POST' });
+                                                const data = await res.json();
+                                                alert(data.message || "Panic sell executed.");
+                                            } catch (e) {
+                                                alert("Panic sell failed.");
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center space-x-2 px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-all shadow-md shadow-red-600/20 active:scale-95 cursor-pointer mr-2"
+                                >
+                                    <span>Panic Sell All</span>
+                                </button>
+                                <button
                                     onClick={handleTrigger}
                                     disabled={triggering}
                                     className="flex items-center space-x-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white rounded-lg text-sm font-medium transition-all shadow-md shadow-blue-600/20 active:scale-95 cursor-pointer"
