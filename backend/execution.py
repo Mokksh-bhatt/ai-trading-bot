@@ -164,7 +164,8 @@ def execute_paper_trade(
 
 
         entry_time = datetime.now(timezone.utc).isoformat()
-        simulated_fees = (entry_price_val * quantity_val) * 0.0001
+        # Bybit Taker Fee is 0.055%. We simulate this exactly.
+        simulated_fees = (entry_price_val * quantity_val) * 0.00055
         
         cursor.execute("""
         INSERT INTO trades (model_name, strategy_tag, asset_class, symbol, status, direction, quantity, entry_price, entry_time, unrealized_pnl, realized_pnl, simulated_fees, reasoning_text, confidence)
@@ -258,15 +259,15 @@ def execute_paper_trade(
                     print(f"[WARNING] No Bybit Keys. Cannot Close {snapshot.symbol}.", flush=True)
                     return # Exit without simulating
             
-            exit_fee = (exit_price_val * quantity) * 0.0001
+            exit_fee = (exit_price_val * quantity) * 0.00055
             total_fees = float(open_trade["simulated_fees"]) + exit_fee
             
             if direction == "long":
                 realized_pnl = ((exit_price_val - entry_price) * quantity) - total_fees
-                pnl_pct = ((exit_price_val - entry_price) / entry_price) * 100
             else:
                 realized_pnl = ((entry_price - exit_price_val) * quantity) - total_fees
-                pnl_pct = ((entry_price - exit_price_val) / entry_price) * 100
+                
+            pnl_pct = (realized_pnl / (entry_price * quantity)) * 100
             
             exit_time = datetime.now(timezone.utc).isoformat()
             updated_reason = f"{open_trade['reasoning_text']} \n\n[EXIT SIGNAL]: {decision.get('reasoning', '')}"

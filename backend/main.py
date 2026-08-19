@@ -158,8 +158,8 @@ async def fast_execution_loop():
                     else:
                         live_pnl_pct = ((entry_price - price) / entry_price) * 100
                     
-                    # Hyper-tight auto-TP/SL
-                    if live_pnl_pct > 0.03 or live_pnl_pct < -0.10:
+                    # Hyper-tight auto-TP/SL (adjusted to clear Bybit 0.055% taker fees x2)
+                    if live_pnl_pct > 0.20 or live_pnl_pct < -0.25:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
                         decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "hft"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
