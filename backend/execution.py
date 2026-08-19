@@ -246,19 +246,14 @@ def execute_paper_trade(
                         
                         qty_to_close = (quantity // qty_step) * qty_step
                         
-                        import time
-                        original_time = time.time
-                        try:
-                            # Bybit rejects requests if local PC clock is >1s ahead of server.
-                            order = bybit_client.place_order(
-                                category="linear",
-                                symbol=pybit_symbol,
-                                side=pybit_side,
-                                orderType="Market",
-                                qty=str(qty_to_close),
-                                reduceOnly=True
-                            )
-                            
+                        order = bybit_client.place_order(
+                            category="linear",
+                            symbol=pybit_symbol,
+                            side=pybit_side,
+                            orderType="Market",
+                            qty=str(qty_to_close),
+                            reduceOnly=True
+                        )
                         # Fetch the actual real-world exit price from Bybit executions
                         try:
                             import time
