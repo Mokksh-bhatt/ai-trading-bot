@@ -35,7 +35,7 @@ def get_bybit_client():
         demo=True,
         api_key=BYBIT_KEY,
         api_secret=BYBIT_SECRET,
-        max_retries=0
+        max_retries=1
     )
 
 def execute_paper_trade(
