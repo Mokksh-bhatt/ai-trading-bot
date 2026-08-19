@@ -148,26 +148,26 @@ def execute_paper_trade(
                             orderType="Market",
                             qty=str(qty_to_trade)
                         )
-                        finally:
-                            time.time = original_time
-                            
-                        # Fetch the actual real-world entry price from Bybit to eliminate slippage discrepancy
-                        try:
-                            import time
-                            time.sleep(0.5) # Wait 500ms for demo exchange to settle
-                            pos_info = bybit_client.get_positions(category="linear", symbol=pybit_symbol)
-                            if pos_info['result']['list']:
-                                avg_price_str = pos_info['result']['list'][0]['avgPrice']
-                                if avg_price_str and float(avg_price_str) > 0:
-                                    entry_price_val = float(avg_price_str)
-                                else:
-                                    entry_price_val = snapshot.price
+                    finally:
+                        time.time = original_time
+                        
+                    # Fetch the actual real-world entry price from Bybit to eliminate slippage discrepancy
+                    try:
+                        import time
+                        time.sleep(0.5) # Wait 500ms for demo exchange to settle
+                        pos_info = bybit_client.get_positions(category="linear", symbol=pybit_symbol)
+                        if pos_info['result']['list']:
+                            avg_price_str = pos_info['result']['list'][0]['avgPrice']
+                            if avg_price_str and float(avg_price_str) > 0:
+                                entry_price_val = float(avg_price_str)
                             else:
                                 entry_price_val = snapshot.price
-                        except:
+                        else:
                             entry_price_val = snapshot.price
-                            
-                        quantity_val = float(qty_to_trade)
+                    except:
+                        entry_price_val = snapshot.price
+                        
+                    quantity_val = float(qty_to_trade)
                         
                 except Exception as e:
                     safe_error = str(e).encode('ascii', 'ignore').decode('ascii')
