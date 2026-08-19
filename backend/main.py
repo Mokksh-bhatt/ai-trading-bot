@@ -18,24 +18,12 @@ from datetime import datetime, timezone
 
 import random
 
-ALL_SYMBOLS = [
-    ("BTC/USDT", "crypto"), ("ETH/USDT", "crypto"), ("SOL/USDT", "crypto"), ("DOGE/USDT", "crypto"),
-    ("XRP/USDT", "crypto"), ("ADA/USDT", "crypto"), ("AVAX/USDT", "crypto"), ("MSTR", "stock")
-]
-
-# The AI dynamically picks assets, but user requested DOGE and MSTR specifically
-SYMBOLS = [
-    ("DOGE/USDT", "crypto"),
-    ("MSTR", "stock"),
-    ("BTC/USDT", "crypto")
-]
-
+from backend.market_scanner import fetch_market_opportunities
 from backend.traders.ollama import OllamaTrader
-
-heuristic = OllamaTrader()
-
 import json
 import os
+
+heuristic = OllamaTrader()
 
 if os.path.exists("/app/data"):
     BIAS_CACHE_FILE = "/app/data/bias_cache.json"
@@ -49,7 +37,7 @@ def load_bias_cache():
                 return json.load(f)
         except:
             pass
-    return {s[0]: {"bias": "neutral", "reasoning": "Initializing..."} for s in SYMBOLS}
+    return {}
 
 def save_bias_cache(cache):
     with open(BIAS_CACHE_FILE, "w") as f:
@@ -58,12 +46,18 @@ def save_bias_cache(cache):
 AI_MACRO_BIAS = load_bias_cache()
 API_ERRORS = {}
 
-async def macro_analysis_loop():
-    print("[INIT] Macro AI Analysis Loop Started (60s tick)", flush=True)
+async def swarm_manager_loop():
+    print("[INIT] Multi-Agent Swarm Manager Loop Started (60s tick)", flush=True)
     cycle_count = 0
     while True:
-        print("--- [MACRO CYCLE START] AI Analyzing Market Trends ---", flush=True)
-        for symbol, asset_class in SYMBOLS:
+        print("--- [SWARM MANAGER START] Scanning Market & Deploying AI Agents ---", flush=True)
+        # Clear the cache so we only evaluate new signals
+        AI_MACRO_BIAS.clear()
+        
+        # 1. Scanner finds volatile coins (Wash-Trade filter applied internally)
+        targets = fetch_market_opportunities(top_n=3)
+        
+        for symbol, asset_class in targets:
             try:
                 # Check if cache is fresh enough to skip (e.g., if we just booted and cache is < 5 mins old)
                 # But since this loop sleeps 60s anyway, we just run it and update the cache.
@@ -76,10 +70,10 @@ async def macro_analysis_loop():
                 long_term_rules = get_learned_rules()
                 base_context.update({"avg_volume": snapshot.volume * 0.95, "recent_trend": "active", "long_term_lessons": long_term_rules})
                 
-                cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'HeuristicTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
+                cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'OllamaTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
                 o_past = [dict(r) for r in cursor.fetchall()]
                 
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'HeuristicTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 current_pos = None
                 if o_open:
@@ -131,7 +125,19 @@ async def fast_execution_loop():
     error_cooldowns = {}
     
     while True:
-        for symbol, asset_class in SYMBOLS:
+        from backend.db import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT symbol FROM trades WHERE status = 'open'")
+        open_symbols = [r["symbol"] for r in cursor.fetchall()]
+        conn.close()
+        
+        active_symbols = set(open_symbols)
+        for s in AI_MACRO_BIAS.keys():
+            active_symbols.add(s)
+            
+        for symbol in active_symbols:
+            asset_class = "crypto" # We only scan and trade Bybit linear futures
             current_time = time.time()
             if symbol in error_cooldowns and current_time < error_cooldowns[symbol]:
                 continue # Skip this symbol until the cooldown expires
@@ -161,7 +167,7 @@ async def fast_execution_loop():
                     # Hyper-tight auto-TP/SL (adjusted to clear Bybit 0.055% taker fees x2)
                     if live_pnl_pct > 0.20 or live_pnl_pct < -0.25:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
-                        decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "hft"}
+                        decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "short_swing"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                 else:
                     # Flat. Check AI bias.
@@ -169,11 +175,11 @@ async def fast_execution_loop():
                     bias = macro_state.get("bias", "neutral")
                     
                     if bias == "bullish":
-                        decision = {"action": "buy", "confidence": 0.9, "reasoning": "AI Bias Bullish Trigger", "timeframe_tag": "hft"}
+                        decision = {"action": "buy", "confidence": 0.9, "reasoning": "AI Bias Bullish Trigger", "timeframe_tag": "momentum"}
                     elif bias == "bearish":
-                        decision = {"action": "sell", "confidence": 0.9, "reasoning": "AI Bias Bearish Trigger", "timeframe_tag": "hft"}
+                        decision = {"action": "sell", "confidence": 0.9, "reasoning": "AI Bias Bearish Trigger", "timeframe_tag": "momentum"}
                     else:
-                        decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "hft"}
+                        decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "momentum"}
                         
                     err = await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                     if err:
@@ -187,7 +193,7 @@ async def fast_execution_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task1 = asyncio.create_task(macro_analysis_loop())
+    task1 = asyncio.create_task(swarm_manager_loop())
     task2 = asyncio.create_task(fast_execution_loop())
     yield
     task1.cancel()
