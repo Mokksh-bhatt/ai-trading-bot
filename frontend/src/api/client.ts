@@ -77,3 +77,12 @@ export const panicSell = async (): Promise<{message: string}> => {
     const res = await apiClient.post('/panic-sell');
     return res.data;
 };
+
+export const checkHealth = async (): Promise<boolean> => {
+    try {
+        await apiClient.get('/models');
+        return true;
+    } catch {
+        return false;
+    }
+};
