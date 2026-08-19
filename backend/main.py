@@ -158,12 +158,12 @@ async def fast_execution_loop():
                 if o_open:
                     entry_price = o_open["entry_price"]
                     direction = o_open["direction"]
-                    
+                    # Deduct Bybit's 0.055% taker fee twice (Entry + Exit = 0.11% round-trip)
+                    # This ensures every trade mathematically starts in the negative as it costs money to open
                     if direction == "long":
-                        live_pnl_pct = ((price - entry_price) / entry_price) * 100
+                        live_pnl_pct = (((price - entry_price) / entry_price) * 100) - 0.11
                     else:
-                        live_pnl_pct = ((entry_price - price) / entry_price) * 100
-                    
+                        live_pnl_pct = (((entry_price - price) / entry_price) * 100) - 0.11
                     # Hyper-tight auto-TP/SL (adjusted to clear Bybit 0.055% taker fees x2)
                     if live_pnl_pct > 0.20 or live_pnl_pct < -0.25:
                         reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"

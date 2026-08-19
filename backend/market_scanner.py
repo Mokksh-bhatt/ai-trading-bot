@@ -1,5 +1,6 @@
 from pybit.unified_trading import HTTP
 import os
+import requests
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -14,12 +15,30 @@ scanner_client = HTTP(
     max_retries=1
 )
 
+def fetch_trending_social_velocity():
+    """
+    Pulls the global top trending coins from CoinGecko's public API to use as a 
+    Social Velocity / Retail Flow proxy, completely for free without API keys.
+    """
+    trending_symbols = set()
+    try:
+        res = requests.get("https://api.coingecko.com/api/v3/search/trending", timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            for coin in data.get("coins", []):
+                sym = coin["item"]["symbol"].upper()
+                trending_symbols.add(sym + "USDT")
+    except Exception as e:
+        print(f"[SCANNER] Could not fetch social velocity data: {e}")
+    return trending_symbols
+
 def fetch_market_opportunities(top_n: int = 3):
     """
     Scans the entire Bybit linear futures market for highly volatile, high-volume trading opportunities.
     Implements a strict Wash-Trade Filter to reject manipulated assets.
     """
     try:
+        trending_symbols = fetch_trending_social_velocity()
         response = scanner_client.get_tickers(category="linear")
         tickers = response.get("result", {}).get("list", [])
         
@@ -50,14 +69,21 @@ def fetch_market_opportunities(top_n: int = 3):
             if abs(price_pct_change) < 0.06:
                 continue
                 
+            # Calculate composite base score
+            base_score = abs(price_pct_change) * turnover
+            
+            # Apply Social Velocity Multiplier if it's globally trending on CoinGecko
+            if symbol in trending_symbols:
+                base_score *= 3.0
+                print(f"[SCANNER] Social Velocity Spike Detected on {symbol}! Applying 3x multiplier.")
+                
             valid_candidates.append({
                 "symbol": symbol,
                 "asset_class": "crypto",
                 "turnover": turnover,
                 "price_change": price_pct_change,
                 "last_price": last_price,
-                # Create a composite score: Volatility * log(Turnover)
-                "score": abs(price_pct_change) * turnover
+                "score": base_score
             })
             
         # Sort by our composite momentum score descending
