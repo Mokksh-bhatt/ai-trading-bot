@@ -170,8 +170,6 @@ def execute_paper_trade(
                     except:
                         entry_price_val = snapshot.price
                         
-                    quantity_val = float(qty_to_trade)
-                        
                 except Exception as e:
                     safe_error = str(e).encode('ascii', 'ignore').decode('ascii')
                     error_msg = f"[BYBIT ERROR] {safe_error}"

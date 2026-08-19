@@ -55,7 +55,7 @@ async def swarm_manager_loop():
         AI_MACRO_BIAS.clear()
         
         # 1. Scanner finds volatile coins (Wash-Trade filter applied internally)
-        targets = fetch_market_opportunities(top_n=3)
+        targets = fetch_market_opportunities(top_n=10)
         
         for symbol, asset_class in targets:
             try:
