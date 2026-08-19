@@ -54,81 +54,84 @@ async def swarm_manager_loop():
         # Clear the cache so we only evaluate new signals
         AI_MACRO_BIAS.clear()
         
-        # 1. Scanner finds volatile coins (Wash-Trade filter applied internally)
+        # 1. Scanner finds volatile coins
         targets = fetch_market_opportunities(top_n=10)
-        for target_data in targets:
-            symbol = target_data["symbol"]
-            asset_class = target_data["asset_class"]
-            try:
-                # Check if cache is fresh enough to skip (e.g., if we just booted and cache is < 5 mins old)
-                # But since this loop sleeps 60s anyway, we just run it and update the cache.
-                snapshot = await asyncio.to_thread(fetch_market_snapshot, symbol, asset_class)
-                from backend.db import get_db_connection
-                conn = get_db_connection()
-                cursor = conn.cursor()
+        
+        # 2. Build the MEGA prompt JSON payload
+        from datetime import datetime, timezone
+        from backend.db import get_db_connection
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT symbol, direction, pnl_pct FROM trades WHERE status = 'open' AND model_name = 'OllamaTrader'")
+        open_positions = [{"symbol": r["symbol"], "side": r["direction"], "unrealized_pnl_pct": r["pnl_pct"]} for r in cursor.fetchall()]
+        conn.close()
+        
+        input_json = {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "account": {
+                "equity_usdt": 100000.0,
+                "risk_per_trade_pct": 1.0,
+                "daily_max_dd_pct": 3.0,
+                "open_positions": open_positions
+            },
+            "global_context": {
+                "btc_trend": "uptrend",
+                "eth_trend": "uptrend",
+                "btc_dominance_change_24h_pct": 0.0,
+                "funding_regime": "positive",
+                "overall_risk_regime": "risk_on",
+                "narratives": ["high momentum session"]
+            },
+            "symbols": targets
+        }
+        
+        # 3. Dispatch to MomentumMacro AI in a single batch
+        try:
+            from backend.traders.ollama import OllamaTrader
+            ollama_trader = OllamaTrader()
+            batch_decision = await asyncio.to_thread(ollama_trader.decide_batch, input_json)
+            
+            # 4. Parse the results and update the macro bias memory
+            global_regime = batch_decision.get('global', {}).get('overall_regime', 'unknown')
+            global_comment = batch_decision.get('global', {}).get('comment', '')
+            print(f"[SWARM] Global Regime: {global_regime.upper()} - {global_comment}", flush=True)
+            
+            for sym_data in batch_decision.get("symbols", []):
+                symbol = sym_data.get("symbol")
+                bias_str = sym_data.get("macro_bias", "avoid")
+                conf = float(sym_data.get("confidence", 0.0))
                 
-                base_context = snapshot.context or {}
-                if "TA" in base_context:
-                    del base_context["TA"] # Remove confusing indicators so the AI purely trades momentum
-                
-                long_term_rules = get_learned_rules()
-                base_context.update({
-                    "24h_price_change_pct": target_data.get("price_change", 0.0) * 100, # Convert to percentage string for the AI
-                    "24h_turnover": target_data.get("turnover", 0.0),
-                    "is_trending_socially": target_data.get("score", 0) > abs(target_data.get("price_change", 0) * target_data.get("turnover", 0)) * 2,
-                    "recent_trend": "extreme_momentum",
-                    "long_term_lessons": long_term_rules
-                })
-                
-                cursor.execute("SELECT symbol, realized_pnl, pnl_pct FROM trades WHERE model_name = 'OllamaTrader' AND status = 'closed' ORDER BY id DESC LIMIT 3")
-                o_past = [dict(r) for r in cursor.fetchall()]
-                
-                cursor.execute("SELECT entry_price, direction FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
-                o_open = cursor.fetchone()
-                current_pos = None
-                if o_open:
-                    entry_price = o_open["entry_price"]
-                    direction = o_open["direction"]
-                    if direction == "long":
-                        live_pnl_pct = ((snapshot.price - entry_price) / entry_price) * 100
-                    else:
-                        live_pnl_pct = ((entry_price - snapshot.price) / entry_price) * 100
-                    current_pos = {"direction": direction, "entry_price": entry_price, "current_price": snapshot.price, "live_pnl_pct": round(live_pnl_pct, 4)}
-                
-                o_context = {**base_context, "past_trades": o_past, "current_position": current_pos}
-                if symbol in API_ERRORS:
-                    o_context["recent_api_error_from_exchange"] = API_ERRORS[symbol]
+                # Map "allow_long_only" -> "bullish", "allow_short_only" -> "bearish"
+                mapped_bias = "neutral"
+                if bias_str == "allow_long_only":
+                    mapped_bias = "bullish"
+                elif bias_str == "allow_short_only":
+                    mapped_bias = "bearish"
                     
-                o_decision = await asyncio.to_thread(heuristic.decide, snapshot, o_context)
-                bias = str(o_decision.get("action", "neutral")).lower()
-                reasoning = o_decision.get("reasoning", "No reasoning")
-                confidence = float(o_decision.get("confidence", 0.0))
-                
-                # Map various AI outputs to strict macro signals
-                # Apply strict confidence threshold: only accept high-conviction signals (>= 0.70)
-                if confidence >= 0.70:
-                    if bias in ["buy", "bullish"]: clean_bias = "bullish"
-                    elif bias in ["sell", "bearish"]: clean_bias = "bearish"
-                    else: clean_bias = "neutral"
+                if conf >= 0.70 and mapped_bias != "neutral":
+                    AI_MACRO_BIAS[symbol] = {
+                        "bias": mapped_bias,
+                        "confidence": conf,
+                        "reasons": sym_data.get("reasons", []),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                    print(f"[MOMENTUM MACRO] {symbol}: {mapped_bias.upper()} (Conf: {conf:.2f})", flush=True)
+                    for r in sym_data.get("reasons", []):
+                        print(f"  -> {r}")
                 else:
-                    clean_bias = "neutral"
-                    reasoning = f"[Low Conviction: {confidence}] {reasoning}"
+                    print(f"[{symbol}] Neutral or low conviction ({conf:.2f}). Skipping.", flush=True)
+            
+            save_bias_cache(AI_MACRO_BIAS)
+        except Exception as e:
+            print(f"[SWARM ERROR] Batch evaluation failed: {e}", flush=True)
                 
-                AI_MACRO_BIAS[symbol] = {
-                    "bias": clean_bias,
-                    "reasoning": reasoning,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
-                save_bias_cache(AI_MACRO_BIAS)
-                
-                print(f"[MACRO AI] {symbol} Bias set to: {clean_bias.upper()} | Reason: {reasoning}", flush=True)
-                
-                conn.close()
-            except Exception as e:
-                print(f"[MACRO ERROR] {symbol}: {e}", flush=True)
-                
+        print("--- [SWARM MANAGER END] Market Memory Updated ---", flush=True)
         cycle_count += 1
+        
         if cycle_count % 10 == 0:
+            from backend.learning import generate_long_term_memory
             asyncio.create_task(asyncio.to_thread(generate_long_term_memory, "qwen2.5-coder:7b"))
             
         await asyncio.sleep(60)

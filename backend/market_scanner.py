@@ -72,16 +72,21 @@ def fetch_market_opportunities(top_n: int = 3):
             # Calculate composite base score
             base_score = abs(price_pct_change) * turnover
             
+            funding_rate = float(t.get("fundingRate", 0))
+            is_trending = symbol in trending_symbols
+            
             # Apply Social Velocity Multiplier if it's globally trending on CoinGecko
-            if symbol in trending_symbols:
+            if is_trending:
                 base_score *= 3.0
                 print(f"[SCANNER] Social Velocity Spike Detected on {symbol}! Applying 3x multiplier.")
                 
             valid_candidates.append({
                 "symbol": symbol,
                 "asset_class": "crypto",
-                "turnover": turnover,
-                "price_change": price_pct_change,
+                "is_trending_socially": is_trending,
+                "price_change_24h_pct": price_pct_change * 100,
+                "turnover_24h_usdt": turnover,
+                "funding_rate_8h_pct": funding_rate * 100,
                 "last_price": last_price,
                 "score": base_score
             })
