@@ -212,8 +212,8 @@ async def fast_execution_loop():
                     if exit_reason:
                         decision = {"action": "close", "confidence": 1.0, "reasoning": exit_reason, "timeframe_tag": "short_swing"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
-                        # The Anti-Machine-Gun Safeguard: 5-minute cooldown after closing to prevent re-entering a chopped signal
-                        error_cooldowns[symbol] = current_time + 300.0 
+                        # The Anti-Machine-Gun Safeguard: 30-second cooldown after closing to ensure the next entry relies on a fresh AI rescan
+                        error_cooldowns[symbol] = current_time + 30.0 
                         if trade_id in trade_peak_pnls:
                             del trade_peak_pnls[trade_id]
                 else:
