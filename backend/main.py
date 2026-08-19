@@ -142,6 +142,7 @@ async def fast_execution_loop():
     # Dictionary to track when a symbol is allowed to trade again after an error
     import time
     error_cooldowns = {}
+    trade_peak_pnls = {} # Tracks the highest PNL achieved by each open trade ID
     
     while True:
         from backend.db import get_db_connection
@@ -193,11 +194,26 @@ async def fast_execution_loop():
                     cursor.execute("UPDATE trades SET unrealized_pnl = ?, pnl_pct = ? WHERE id = ?", (unrealized_pnl, live_pnl_pct, trade_id))
                     conn.commit()
 
-                    # High Risk/Reward auto-TP/SL
-                    # TP = 0.35%, SL = -0.25% (Net of 0.11% fees). This ensures an asymmetric RR of 1.4:1+
-                    if live_pnl_pct > 0.35 or live_pnl_pct < -0.25:
-                        reason = f"Grid Execution Auto-Exit ({direction.upper()}) at {live_pnl_pct:.4f}%"
-                        decision = {"action": "close", "confidence": 1.0, "reasoning": reason, "timeframe_tag": "short_swing"}
+                    # Update peak PnL for trailing stop
+                    if trade_id not in trade_peak_pnls:
+                        trade_peak_pnls[trade_id] = live_pnl_pct
+                    else:
+                        trade_peak_pnls[trade_id] = max(trade_peak_pnls[trade_id], live_pnl_pct)
+
+                    peak_pct = trade_peak_pnls[trade_id]
+
+                    # Infinite Profit / Trailing Stop Logic
+                    # Hard Stop Loss: -0.25%
+                    # Trailing Stop: Drops 0.09% from the peak (activates only after reaching +0.10% profit)
+                    
+                    exit_reason = None
+                    if live_pnl_pct <= -0.25:
+                        exit_reason = f"Grid Hard Stop-Loss ({direction.upper()}) hit at {live_pnl_pct:.4f}%"
+                    elif peak_pct >= 0.10 and live_pnl_pct <= (peak_pct - 0.09):
+                        exit_reason = f"Grid Trailing Stop ({direction.upper()}) locked profit at {live_pnl_pct:.4f}% (Peak: {peak_pct:.4f}%)"
+                        
+                    if exit_reason:
+                        decision = {"action": "close", "confidence": 1.0, "reasoning": exit_reason, "timeframe_tag": "short_swing"}
                         await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
                 else:
                     # Flat. Check AI bias.
