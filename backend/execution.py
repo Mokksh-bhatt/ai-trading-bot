@@ -130,7 +130,19 @@ def execute_paper_trade(
                     print(f"[{model_name}] [BYBIT {pybit_side.upper()}] Sending Demo Order for {snapshot.symbol}!", flush=True)
                     
                     pybit_symbol = snapshot.symbol.replace("/", "")
-                    # Fetch instrument info for precision
+                    
+                    # PRE-FLIGHT CHECK: Ensure the user doesn't already have a manual position open
+                    # In One-Way mode, opening a Long while a manual Short is open will just reduce the Short, causing chaos
+                    try:
+                        pos_info = bybit_client.get_positions(category="linear", symbol=pybit_symbol)
+                        if pos_info['result']['list']:
+                            live_size = float(pos_info['result']['list'][0]['size'])
+                            if live_size > 0:
+                                print(f"[WARNING] Skipping {snapshot.symbol}: Pre-existing manual position detected on Bybit ({live_size}).", flush=True)
+                                return "Skipped due to pre-existing manual position"
+                    except Exception as e:
+                        pass
+                        
                     # Fetch instrument info for precision
                     market_info = bybit_client.get_instruments_info(category="linear", symbol=pybit_symbol)
                     qty_step_str = market_info['result']['list'][0]['lotSizeFilter']['qtyStep']
@@ -257,14 +269,23 @@ def execute_paper_trade(
                         raw_qty = (quantity // qty_step) * qty_step
                         qty_to_close_str = f"{raw_qty:.{decimals}f}"
                         
-                        order = bybit_client.place_order(
-                            category="linear",
-                            symbol=pybit_symbol,
-                            side=pybit_side,
-                            orderType="Market",
-                            qty=qty_to_close_str,
-                            reduceOnly=True
-                        )
+                        try:
+                            order = bybit_client.place_order(
+                                category="linear",
+                                symbol=pybit_symbol,
+                                side=pybit_side,
+                                orderType="Market",
+                                qty=qty_to_close_str,
+                                reduceOnly=True
+                            )
+                        except Exception as e:
+                            err_str = str(e)
+                            if "110017" in err_str or "same side" in err_str or "too large" in err_str or "does not exist" in err_str.lower():
+                                print(f"[WARNING] Unrecoverable Bybit position state for {snapshot.symbol}. Forcing local DB close to prevent loop.", flush=True)
+                                # Force close in database since it's gone on Bybit
+                                pass
+                            else:
+                                raise e
                         # Fetch the actual real-world exit price from Bybit executions
                         try:
                             import time
