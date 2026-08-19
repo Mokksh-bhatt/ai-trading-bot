@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Do not enter positions with an entry price that is too close to the exit price, as it increases the risk of significant losses.",
-        "Monitor pnl_pct closely during grid execution and exit positions when the pnl_pct reaches a negative value greater than 5% to minimize losses.",
-        "Use the AI Bias trigger as a guide for when to enter or exit positions, but do not rely solely on it. Always analyze market conditions and adjust your strategy accordingly."
+        "Rule 1: Avoid trading with symbols that have a high risk of massive losses. Symbols like ZECUSDT and BTWUSDT had multiple instances where the pnl_pct was negative by more than 50%, indicating extreme volatility or potential manipulation.",
+        "Rule 2: Set strict stop-loss levels to prevent further losses once a trade goes against you. The example with ZECUSDT hitting a -104.6% Grid Hard Stop-Loss shows how important it is to have a safety net in place.",
+        "Rule 3: Monitor the performance of your grid strategy regularly and make adjustments based on historical data and market trends. Symbols like BTWUSDT, which showed significant price movements both up and down, highlight the need for flexibility and adaptability in trading strategies."
     ]
 }

@@ -32,6 +32,56 @@ def fetch_trending_social_velocity():
         print(f"[SCANNER] Could not fetch social velocity data: {e}")
     return trending_symbols
 
+def calc_rsi(closes, period=14):
+    if len(closes) < period + 1: return 50.0
+    gains = []
+    losses = []
+    for i in range(1, len(closes)):
+        diff = closes[i] - closes[i-1]
+        if diff >= 0:
+            gains.append(diff)
+            losses.append(0)
+        else:
+            gains.append(0)
+            losses.append(abs(diff))
+    avg_gain = sum(gains[-period:]) / period
+    avg_loss = sum(losses[-period:]) / period
+    if avg_loss == 0: return 100.0
+    rs = avg_gain / avg_loss
+    return round(100 - (100 / (1 + rs)), 2)
+
+def calc_macd(closes, short_period=12, long_period=26, signal_period=9):
+    def ema(data, period):
+        k = 2 / (period + 1)
+        ema_vals = [data[0]]
+        for price in data[1:]:
+            ema_vals.append(price * k + ema_vals[-1] * (1 - k))
+        return ema_vals
+    
+    if len(closes) < long_period + signal_period: return "Neutral"
+    short_ema = ema(closes, short_period)
+    long_ema = ema(closes, long_period)
+    macd_line = [s - l for s, l in zip(short_ema, long_ema)]
+    signal_line = ema(macd_line, signal_period)
+    hist = macd_line[-1] - signal_line[-1]
+    if hist > 0 and macd_line[-1] > macd_line[-2]: return "Bullish Cross / Growing"
+    elif hist < 0 and macd_line[-1] < macd_line[-2]: return "Bearish Cross / Growing"
+    return "Neutral"
+
+def calc_bollinger(closes, period=20, std_dev=2):
+    if len(closes) < period: return "Neutral"
+    recent = closes[-period:]
+    sma = sum(recent) / period
+    variance = sum((x - sma) ** 2 for x in recent) / period
+    import math
+    sd = math.sqrt(variance)
+    upper = sma + (sd * std_dev)
+    lower = sma - (sd * std_dev)
+    last = closes[-1]
+    if last >= upper: return "Touching Upper Band (Overbought)"
+    elif last <= lower: return "Touching Lower Band (Oversold)"
+    return "Inside Bands"
+
 def fetch_market_opportunities(top_n: int = 3):
     """
     Scans the entire Bybit linear futures market for highly volatile, high-volume trading opportunities.
@@ -59,13 +109,10 @@ def fetch_market_opportunities(top_n: int = 3):
                 continue
                 
             # Filter 2: The Wash-Trade Filter
-            # If an asset has massive volume (top 20%) but has barely moved (< 5%), it's being wash traded or suppressed.
-            # Reject it to prevent the AI from getting chopped up in artificial sideways chop.
             if turnover > 50_000_000 and abs(price_pct_change) < 0.05:
                 continue # Reject
                 
             # Filter 3: Minimum volatility
-            # We want coins that are ACTUALLY moving so the AI has a trend to ride.
             if abs(price_pct_change) < 0.06:
                 continue
                 
@@ -94,8 +141,34 @@ def fetch_market_opportunities(top_n: int = 3):
         # Sort by our composite momentum score descending
         valid_candidates.sort(key=lambda x: x["score"], reverse=True)
         
-        # Return the full dictionaries so the AI can see the actual volatility and turnover
-        return valid_candidates[:top_n]
+        top_candidates = valid_candidates[:top_n]
+        
+        # Calculate Technical Indicators (RSI, MACD, Bollinger Bands) for the Top N coins
+        for c in top_candidates:
+            symbol = c["symbol"]
+            try:
+                # Fetch 15-minute candle data (last 50 candles)
+                klines = scanner_client.get_kline(category="linear", symbol=symbol, interval="15", limit=50)
+                list_data = klines.get("result", {}).get("list", [])
+                list_data.reverse() # Reverse to chronological order (oldest to newest)
+                closes = [float(candle[4]) for candle in list_data]
+                
+                if len(closes) >= 35:
+                    c["RSI_14"] = calc_rsi(closes)
+                    c["MACD_Histogram"] = calc_macd(closes)
+                    c["Bollinger_Band"] = calc_bollinger(closes)
+                else:
+                    c["RSI_14"] = 50.0
+                    c["MACD_Histogram"] = "Neutral"
+                    c["Bollinger_Band"] = "Inside Bands"
+            except Exception as e:
+                print(f"[SCANNER] Failed to calc tech indicators for {symbol}: {e}")
+                c["RSI_14"] = 50.0
+                c["MACD_Histogram"] = "Neutral"
+                c["Bollinger_Band"] = "Inside Bands"
+                
+        # Return the full dictionaries so the AI can see the actual volatility, turnover, and tech indicators
+        return top_candidates
         
     except Exception as e:
         print(f"[SCANNER ERROR] Failed to fetch market opportunities: {e}")
