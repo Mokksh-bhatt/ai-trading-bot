@@ -61,14 +61,17 @@ def execute_paper_trade(
     
     # Mark to market if position is open
     if open_trade:
-        direction = open_trade["direction"]
-        if direction == "long":
-            unrealized_pnl = (snapshot.price - open_trade["entry_price"]) * open_trade["quantity"]
-            pnl_pct = ((snapshot.price - open_trade["entry_price"]) / open_trade["entry_price"]) * 100
+        # Theoretical exit fee based on current price
+        theoretical_exit_fee = (snapshot.price * open_trade["quantity"]) * 0.00055
+        total_theoretical_fees = float(open_trade["simulated_fees"]) + theoretical_exit_fee
+        
+        if open_trade["direction"] == "long":
+            unrealized_pnl = ((snapshot.price - open_trade["entry_price"]) * open_trade["quantity"]) - total_theoretical_fees
         else:
-            unrealized_pnl = (open_trade["entry_price"] - snapshot.price) * open_trade["quantity"]
-            pnl_pct = ((open_trade["entry_price"] - snapshot.price) / open_trade["entry_price"]) * 100
+            unrealized_pnl = ((open_trade["entry_price"] - snapshot.price) * open_trade["quantity"]) - total_theoretical_fees
             
+        pnl_pct = (unrealized_pnl / (open_trade["entry_price"] * open_trade["quantity"])) * 100
+        
         cursor.execute(
             "UPDATE trades SET unrealized_pnl = ?, pnl_pct = ? WHERE id = ?",
             (unrealized_pnl, pnl_pct, open_trade["id"])

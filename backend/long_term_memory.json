@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Do not enter trades when live PnL is below the critical exit rule of -0.5%.",
-        "Cut losses immediately when a position's PnL exceeds the critical loss threshold of -0.5%",
-        "Sell positions with a PnL below the target profit threshold of 10% to lock in profits."
+        "Avoid entering trades based on AI Bias Bullish Triggers in DOGE/USDT, as it resulted in a ghost trade that was forced to close with a negative pnl_pct of 770.51%.",
+        "Exit trades at grid execution auto-exit signals when the pnl_pct is below -2%, to prevent further losses.",
+        "Do not enter trades on BTC/USDT if there is no clear bullish trigger, as it resulted in a forced close with a negative pnl_pct of 30.16%"
     ]
 }
