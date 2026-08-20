@@ -12,7 +12,7 @@ from backend.traders.heuristic import HeuristicTrader
 from backend.traders.ollama import OllamaTrader
 from backend.execution import execute_paper_trade
 from backend.learning import generate_long_term_memory, get_learned_rules
-from backend.db import get_db_connection, init_db
+from backend.db import get_db_connection
 from dotenv import load_dotenv
 load_dotenv(override=True)
 from datetime import datetime, timezone
@@ -302,7 +302,6 @@ async def simple_scalper_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
     task1 = asyncio.create_task(swarm_manager_loop())
     task2 = asyncio.create_task(fast_execution_loop())
     task3 = asyncio.create_task(simple_scalper_loop())
