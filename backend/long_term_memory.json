@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Do not trigger Grid Hard Stop-Loss (LONG) when the price falls by more than -0.5%",
-        "Avoid entering trades with entry prices that are too close to support levels, as this increases the likelihood of a hard stop-loss being hit",
-        "Monitor the AI Bias Bullish Trigger closely and only execute trades when there is strong bullish sentiment in the market"
+        "Rule 1: Avoid using Grid Trailing Stop (LONG) as an exit strategy for entries made during a bull market, as it can lead to significant losses if the price moves against the trade.",
+        "Rule 2: Implement stricter stop-loss orders and avoid using Grid Hard Stop-Loss (LONG) or Grid Hard Stop-Loss (SHORT) with such high percentages, as they can result in substantial losses when the market moves unexpectedly.",
+        "Rule 3: Utilize Grid Execution Auto-Exit only during neutral or bearish market conditions to prevent premature exits that could lead to significant losses."
     ]
 }

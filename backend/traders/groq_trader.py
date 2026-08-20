@@ -5,7 +5,7 @@ from backend.traders.base import Trader, TraderDecision
 from backend.models import MarketSnapshot
 
 class GroqTrader(Trader):
-    def __init__(self, model_name: str = "openai/gpt-oss-120b"):
+    def __init__(self, model_name: str = "qwen/qwen3.6-27b"):
         self.model_name = model_name
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
         self.api_key = os.getenv("GROQ_API_KEY")
