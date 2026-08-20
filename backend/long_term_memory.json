@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Rule 1: Avoid using Grid Trailing Stop (LONG) as an exit strategy for entries made during a bull market, as it can lead to significant losses if the price moves against the trade.",
-        "Rule 2: Implement stricter stop-loss orders and avoid using Grid Hard Stop-Loss (LONG) or Grid Hard Stop-Loss (SHORT) with such high percentages, as they can result in substantial losses when the market moves unexpectedly.",
-        "Rule 3: Utilize Grid Execution Auto-Exit only during neutral or bearish market conditions to prevent premature exits that could lead to significant losses."
+        "Avoid entering trades during high volatility periods, as seen in the cases of ZECUSDT where large price movements triggered stop-losses.",
+        "Implement a trailing stop loss to lock in profits and minimize losses. The example with BTWUSDT shows that locking profit at 0.2368% was beneficial compared to waiting until it hit -1.0461%.",
+        "Be cautious when using grid execution auto-exit as it can lead to unexpected losses, particularly with high volatility. ZECUSDT's case of losing 0.5395% highlights this risk."
     ]
 }

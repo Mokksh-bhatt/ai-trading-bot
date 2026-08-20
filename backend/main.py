@@ -248,8 +248,8 @@ async def simple_scalper_loop():
     The original, highly aggressive scalping logic.
     Evaluates coins independently without macro batching.
     """
-    from backend.traders.simple_trader import SimpleTrader
-    simple_trader = SimpleTrader()
+    from backend.traders.ollama import OllamaTrader
+    simple_trader = OllamaTrader()
     import time
     
     while True:
