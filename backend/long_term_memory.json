@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Avoid entering trades when the price is near a resistance level as it increases the likelihood of hitting a hard stop-loss, leading to significant losses.",
-        "Always set a trailing stop loss that allows for some profit room while being close enough to the entry point to catch any upward momentum, but not too close to avoid being stopped out on minor retracement.",
-        "Monitor the trade's performance regularly and consider manual intervention if the price movement deviates significantly from the expected trend, especially when approaching a key level of support or resistance."
+        "Avoid Grid Hard Stop-Loss (LONG) triggers at or above -0.5%, as this resulted in massive losses.",
+        "Utilize Grid Trailing Stop (LONG) to lock profits at a minimum of 0.0105% and consider increasing the lockout threshold based on market conditions.",
+        "Implement an AI Bias Bullish Trigger with a grid that has a sufficient number of steps and a wide enough price range to capture potential gains while minimizing losses."
     ]
 }
