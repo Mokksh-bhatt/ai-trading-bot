@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Avoid entering trades when the AI Bias Bullish Trigger is active, as it often leads to massive losses.",
-        "Set stop-loss levels that are well below entry prices to minimize potential losses in case of a sharp price drop.",
-        "Utilize trailing stop features to automatically lock in profits as the price moves favorably, ensuring higher win rates."
+        "Avoid entering trades when the price is near a resistance level as it increases the likelihood of hitting a hard stop-loss, leading to significant losses.",
+        "Always set a trailing stop loss that allows for some profit room while being close enough to the entry point to catch any upward momentum, but not too close to avoid being stopped out on minor retracement.",
+        "Monitor the trade's performance regularly and consider manual intervention if the price movement deviates significantly from the expected trend, especially when approaching a key level of support or resistance."
     ]
 }

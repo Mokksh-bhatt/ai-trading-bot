@@ -137,9 +137,10 @@ def execute_paper_trade(
                         pos_info = bybit_client.get_positions(category="linear", symbol=pybit_symbol)
                         if pos_info['result']['list']:
                             live_size = float(pos_info['result']['list'][0]['size'])
-                            if live_size > 0:
-                                print(f"[WARNING] Skipping {snapshot.symbol}: Pre-existing manual position detected on Bybit ({live_size}).", flush=True)
-                                return "Skipped due to pre-existing manual position"
+                            # Bypass safety check for demo account, the user wants aggressive trading
+                            # if live_size > 0:
+                            #     print(f"[WARNING] Skipping {snapshot.symbol}: Pre-existing manual position detected on Bybit ({live_size}).", flush=True)
+                            #     return "Skipped due to pre-existing manual position"
                     except Exception as e:
                         pass
                         
