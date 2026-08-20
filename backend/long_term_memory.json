@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Rule 1: Avoid trading with symbols that have a high risk of massive losses. Symbols like ZECUSDT and BTWUSDT had multiple instances where the pnl_pct was negative by more than 50%, indicating extreme volatility or potential manipulation.",
-        "Rule 2: Set strict stop-loss levels to prevent further losses once a trade goes against you. The example with ZECUSDT hitting a -104.6% Grid Hard Stop-Loss shows how important it is to have a safety net in place.",
-        "Rule 3: Monitor the performance of your grid strategy regularly and make adjustments based on historical data and market trends. Symbols like BTWUSDT, which showed significant price movements both up and down, highlight the need for flexibility and adaptability in trading strategies."
+        "Do not trigger Grid Hard Stop-Loss (LONG) when the price falls by more than -0.5%",
+        "Avoid entering trades with entry prices that are too close to support levels, as this increases the likelihood of a hard stop-loss being hit",
+        "Monitor the AI Bias Bullish Trigger closely and only execute trades when there is strong bullish sentiment in the market"
     ]
 }

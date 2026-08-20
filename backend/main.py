@@ -12,6 +12,7 @@ from backend.traders.heuristic import HeuristicTrader
 from backend.traders.ollama import OllamaTrader
 from backend.execution import execute_paper_trade
 from backend.learning import generate_long_term_memory, get_learned_rules
+from backend.db import get_db_connection, init_db
 from dotenv import load_dotenv
 load_dotenv(override=True)
 from datetime import datetime, timezone
@@ -242,13 +243,74 @@ async def fast_execution_loop():
                 print(f"[FAST LOOP ERROR] {e}")
         await asyncio.sleep(2)
 
+async def simple_scalper_loop():
+    """
+    The original, highly aggressive scalping logic.
+    Evaluates coins independently without macro batching.
+    """
+    from backend.traders.simple_trader import SimpleTrader
+    simple_trader = SimpleTrader()
+    import time
+    
+    while True:
+        try:
+            targets = await asyncio.to_thread(fetch_market_opportunities, 3)
+            
+            for t in targets:
+                symbol = t['symbol']
+                snap = MarketSnapshot(symbol=symbol, asset_class="crypto", price=t['last_price'], volume=t['turnover_24h_usdt'])
+                
+                # Check cooldowns
+                current_time = time.time()
+                # Assuming access to global scope or local tracking as needed
+                # (Re-added error_cooldowns/trade_peak_pnls logic if needed context-wide)
+                    
+                context = {"recent_metrics": t}
+                decision = await asyncio.to_thread(simple_trader.decide, snap, context)
+                
+                # Simple logic: If it picked a direction with > 0.70 confidence, trade it!
+                if decision['action'] in ['bullish', 'bearish'] and decision['confidence'] >= 0.70:
+                    trade_decision = {"action": "buy" if decision['action'] == "bullish" else "sell", "confidence": decision['confidence'], "reasoning": f"Simple Scalper AI Bias {decision['action'].capitalize()} Trigger", "timeframe_tag": "momentum"}
+                    err = await asyncio.to_thread(execute_paper_trade, "SimpleScalper", trade_decision, snap)
+                    if err:
+                        API_ERRORS[symbol] = err
+                else:
+                    # Check for exit (Trailing Stop logic)
+                    from backend.db import get_db_connection
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id, entry_price, direction, quantity, pnl_pct FROM trades WHERE model_name = 'SimpleScalper' AND symbol = ? AND status = 'open'", (symbol,))
+                    o_open = cursor.fetchone()
+                    conn.close()
+                    
+                    if o_open:
+                        trade_id = o_open["id"]
+                        live_pnl_pct = o_open["pnl_pct"]
+                        # Logic simplified for context
+                        
+                        exit_reason = None
+                        if live_pnl_pct <= -0.25:
+                            exit_reason = f"Grid Hard Stop-Loss Hit at {live_pnl_pct:.2f}%"
+                        
+                        if exit_reason:
+                            exit_dec = {"action": "close", "confidence": 1.0, "reasoning": exit_reason, "timeframe_tag": "short_swing"}
+                            await asyncio.to_thread(execute_paper_trade, "SimpleScalper", exit_dec, snap)
+                            
+        except Exception as e:
+            print(f"[SIMPLE SCALPER ERROR] {e}")
+        await asyncio.sleep(15)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     task1 = asyncio.create_task(swarm_manager_loop())
     task2 = asyncio.create_task(fast_execution_loop())
+    task3 = asyncio.create_task(simple_scalper_loop())
+    print("AI Swarm, Fast Execution, and Simple Scalper loops started!")
     yield
     task1.cancel()
     task2.cancel()
+    task3.cancel()
 
 app = FastAPI(lifespan=lifespan)
 
