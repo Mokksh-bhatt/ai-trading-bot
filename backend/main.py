@@ -258,7 +258,7 @@ async def simple_scalper_loop():
             
             for t in targets:
                 symbol = t['symbol']
-                snap = MarketSnapshot(symbol=symbol, asset_class="crypto", price=t['last_price'], volume=t['turnover_24h_usdt'])
+                snap = MarketSnapshot(symbol=symbol, asset_class="crypto", price=t['last_price'], volume=t['turnover_24h_usdt'], timestamp=datetime.now(timezone.utc))
                 
                 # Check cooldowns
                 current_time = time.time()

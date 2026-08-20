@@ -1,7 +1,7 @@
 {
     "learned_rules": [
-        "Avoid entering trades during high volatility periods, as seen in the cases of ZECUSDT where large price movements triggered stop-losses.",
-        "Implement a trailing stop loss to lock in profits and minimize losses. The example with BTWUSDT shows that locking profit at 0.2368% was beneficial compared to waiting until it hit -1.0461%.",
-        "Be cautious when using grid execution auto-exit as it can lead to unexpected losses, particularly with high volatility. ZECUSDT's case of losing 0.5395% highlights this risk."
+        "Avoid entering trades when the AI Bias Bullish Trigger is active, as it often leads to massive losses.",
+        "Set stop-loss levels that are well below entry prices to minimize potential losses in case of a sharp price drop.",
+        "Utilize trailing stop features to automatically lock in profits as the price moves favorably, ensuring higher win rates."
     ]
 }
