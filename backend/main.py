@@ -64,7 +64,7 @@ async def swarm_manager_loop():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT symbol, direction, pnl_pct FROM trades WHERE status = 'open' AND model_name = 'OllamaTrader'")
+        cursor.execute("SELECT symbol, direction, pnl_pct FROM trades WHERE status = 'open' AND model_name = 'GroqTrader'")
         open_positions = [{"symbol": r["symbol"], "side": r["direction"], "unrealized_pnl_pct": r["pnl_pct"]} for r in cursor.fetchall()]
         conn.close()
         
@@ -89,9 +89,9 @@ async def swarm_manager_loop():
         
         # 3. Dispatch to MomentumMacro AI in a single batch
         try:
-            from backend.traders.ollama import OllamaTrader
-            ollama_trader = OllamaTrader()
-            batch_decision = await asyncio.to_thread(ollama_trader.decide_batch, input_json)
+            from backend.traders.groq_trader import GroqTrader
+            groq_trader = GroqTrader()
+            batch_decision = await asyncio.to_thread(groq_trader.decide_batch, input_json)
             
             # 4. Parse the results and update the macro bias memory
             global_regime = batch_decision.get('global', {}).get('overall_regime', 'unknown')
@@ -172,7 +172,7 @@ async def fast_execution_loop():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                cursor.execute("SELECT id, entry_price, direction, quantity FROM trades WHERE model_name = 'OllamaTrader' AND symbol = ? AND status = 'open'", (symbol,))
+                cursor.execute("SELECT id, entry_price, direction, quantity FROM trades WHERE model_name = 'GroqTrader' AND symbol = ? AND status = 'open'", (symbol,))
                 o_open = cursor.fetchone()
                 
                 if o_open:
@@ -211,7 +211,7 @@ async def fast_execution_loop():
                         
                     if exit_reason:
                         decision = {"action": "close", "confidence": 1.0, "reasoning": exit_reason, "timeframe_tag": "short_swing"}
-                        await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                        await asyncio.to_thread(execute_paper_trade, "GroqTrader", decision, lite_snap)
                         # The Anti-Machine-Gun Safeguard: 30-second cooldown after closing to ensure the next entry relies on a fresh AI rescan
                         error_cooldowns[symbol] = current_time + 30.0 
                         if trade_id in trade_peak_pnls:
@@ -228,7 +228,7 @@ async def fast_execution_loop():
                     else:
                         decision = {"action": "hold", "confidence": 0.0, "reasoning": "AI Bias Neutral", "timeframe_tag": "momentum"}
                         
-                    err = await asyncio.to_thread(execute_paper_trade, "OllamaTrader", decision, lite_snap)
+                    err = await asyncio.to_thread(execute_paper_trade, "GroqTrader", decision, lite_snap)
                     if err:
                         API_ERRORS[symbol] = err
                         if "110126" in err or "agreement" in err.lower():
